@@ -1,0 +1,99 @@
+name: Promote validated candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: Project to promote
+        required: true
+        type: choice
+        options:
+          - comfyui
+          - sunshine
+      upstream_ref:
+        description: Upstream release tag already built as candidate
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  promote-comfyui:
+    if: inputs.project == 'comfyui'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare names
+        id: meta
+        env:
+          REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          safe_ref="$(printf '%s' "$REF" | tr '/:@ ' '----')"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/comfyui-pascal"
+          echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote container tags
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE:${SAFE_REF}-candidate"
+          docker tag "$IMAGE:${SAFE_REF}-candidate" "$IMAGE:${SAFE_REF}"
+          docker tag "$IMAGE:${SAFE_REF}-candidate" "$IMAGE:stable"
+          docker push "$IMAGE:${SAFE_REF}"
+          docker push "$IMAGE:stable"
+
+      - name: Create stable release marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.upstream_ref }}
+          IMAGE: ${{ steps.meta.outputs.image }}
+          SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
+        run: |
+          gh release create "comfyui-${SAFE_REF}-stable" \
+            --title "ComfyUI $REF stable compatibility build" \
+            --notes "Validated compatibility build. Container: \`$IMAGE:${SAFE_REF}\` (also tagged \`stable\`)."
+
+  promote-sunshine:
+    if: inputs.project == 'sunshine'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare names
+        id: meta
+        env:
+          REF: ${{ inputs.upstream_ref }}
+        run: |
+          safe_ref="$(printf '%s' "$REF" | tr '/:@ ' '----')"
+          echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Download candidate package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
+        run: |
+          set -euo pipefail
+          mkdir artifacts
+          gh release download "sunshine-${SAFE_REF}-candidate" --dir artifacts
+
+      - name: Publish stable package release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.upstream_ref }}
+          SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
+        run: |
+          set -euo pipefail
+          gh release create "sunshine-${SAFE_REF}-stable" \
+            artifacts/* \
+            --title "Sunshine $REF stable compatibility build" \
+            --notes "Validated Ubuntu 22.04/x86-64 compatibility package built from upstream Sunshine $REF."
