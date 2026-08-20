@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 AS build
+FROM nvidia/cuda:12.6.3-devel-ubuntu22.04 AS build
 
 ARG SUNSHINE_REF
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -15,6 +15,10 @@ RUN git clone --filter=blob:none https://github.com/LizardByte/Sunshine.git \
     && git checkout --detach "${SUNSHINE_REF}"
 
 WORKDIR /build/Sunshine
+
+# Install all non-CUDA dependencies using Sunshine's own build script.
+# CUDA is already provided by the pinned NVIDIA devel base image, so we avoid
+# the script downloading a newer toolkit while still enabling CUDA at configure time.
 RUN chmod +x scripts/linux_build.sh \
     && ./scripts/linux_build.sh \
          --step=deps \
@@ -22,19 +26,25 @@ RUN chmod +x scripts/linux_build.sh \
          --skip-cuda \
          --sudo-off
 
-RUN ./scripts/linux_build.sh \
+# Do NOT pass --skip-cuda from this point onward. The configure step will find
+# nvcc 12.6 from the base image and build SUNSHINE_BUILD_CUDA/NvFBC support.
+# Sunshine upstream includes compute capability 6.1 when CUDA < 13, which is
+# required for Pascal GPUs such as the GTX 1050 Ti.
+RUN nvcc --version \
+    && ./scripts/linux_build.sh \
       --step=cmake \
-      --skip-cuda \
       --publisher-name='Pascal Builds' \
       --publisher-website='https://github.com/gmalanowski/Pascal-builds' \
       --publisher-issue-url='https://github.com/gmalanowski/Pascal-builds/issues' \
       --sudo-off \
-    && ./scripts/linux_build.sh --step=validation --skip-cuda --sudo-off \
-    && ./scripts/linux_build.sh --step=build --skip-cuda --sudo-off \
-    && ./scripts/linux_build.sh --step=package --skip-cuda --sudo-off
+    && grep -E 'CMAKE_CUDA_COMPILER:FILEPATH|CMAKE_CUDA_COMPILER_VERSION|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA' build/CMakeCache.txt || true \
+    && ./scripts/linux_build.sh --step=validation --sudo-off \
+    && ./scripts/linux_build.sh --step=build --sudo-off \
+    && ./scripts/linux_build.sh --step=package --sudo-off
 
 RUN test -s build/cpack_artifacts/Sunshine.deb \
-    && dpkg-deb --info build/cpack_artifacts/Sunshine.deb >/dev/null
+    && dpkg-deb --info build/cpack_artifacts/Sunshine.deb >/dev/null \
+    && (strings build/sunshine | grep -q 'NvFBC' || true)
 
 FROM scratch AS artifact
-COPY --from=build /build/Sunshine/build/cpack_artifacts/Sunshine.deb /sunshine-ubuntu22-x86_64.deb
+COPY --from=build /build/Sunshine/build/cpack_artifacts/Sunshine.deb /sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb
