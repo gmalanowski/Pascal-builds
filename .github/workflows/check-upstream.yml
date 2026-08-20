@@ -1,0 +1,77 @@
+name: Check upstream releases
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * *'
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - project: comfyui
+            upstream: Comfy-Org/ComfyUI
+            workflow: build-comfyui.yml
+          - project: sunshine
+            upstream: LizardByte/Sunshine
+            workflow: build-sunshine.yml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read latest stable release
+        id: release
+        env:
+          UPSTREAM: ${{ matrix.upstream }}
+        run: |
+          set -euo pipefail
+          json="$(python3 scripts/latest-release.py "$UPSTREAM")"
+          tag="$(jq -r '.tag_name' <<<"$json")"
+          prerelease="$(jq -r '.prerelease' <<<"$json")"
+          draft="$(jq -r '.draft' <<<"$json")"
+
+          if [[ -z "$tag" || "$tag" == "null" ]]; then
+            echo "No release tag found for $UPSTREAM" >&2
+            exit 1
+          fi
+          if [[ "$prerelease" != "false" || "$draft" != "false" ]]; then
+            echo "Latest release is not stable; skipping"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "build=true" >> "$GITHUB_OUTPUT"
+
+      - name: Check for existing candidate marker
+        if: steps.release.outputs.build == 'true'
+        id: marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROJECT: ${{ matrix.project }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          marker="${PROJECT}-${TAG}-candidate"
+          if gh release view "$marker" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger compatibility build
+        if: steps.release.outputs.build == 'true' && steps.marker.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW: ${{ matrix.workflow }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh workflow run "$WORKFLOW" --ref main -f upstream_ref="$TAG"
