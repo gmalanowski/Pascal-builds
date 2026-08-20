@@ -10,9 +10,15 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-RUN git clone --filter=blob:none https://github.com/LizardByte/Sunshine.git \
+# Sunshine relies on a number of git submodules (moonlight-common-c,
+# Simple-Web-Server, libdisplaydevice, build-deps, etc.). A plain clone leaves
+# those directories empty, so always initialize the exact submodule revisions
+# recorded by the selected upstream release.
+RUN git clone https://github.com/LizardByte/Sunshine.git \
     && cd Sunshine \
-    && git checkout --detach "${SUNSHINE_REF}"
+    && git checkout --detach "${SUNSHINE_REF}" \
+    && git submodule sync --recursive \
+    && git submodule update --init --recursive
 
 WORKDIR /build/Sunshine
 
@@ -30,21 +36,23 @@ RUN chmod +x scripts/linux_build.sh \
 # nvcc 12.6 from the base image and build SUNSHINE_BUILD_CUDA/NvFBC support.
 # Sunshine upstream includes compute capability 6.1 when CUDA < 13, which is
 # required for Pascal GPUs such as the GTX 1050 Ti.
-RUN nvcc --version \
-    && ./scripts/linux_build.sh \
+#
+# Keep the diagnostic grep non-fatal without masking a failed configure step.
+RUN set -e; \
+    nvcc --version; \
+    ./scripts/linux_build.sh \
       --step=cmake \
       --publisher-name='Pascal Builds' \
       --publisher-website='https://github.com/gmalanowski/Pascal-builds' \
       --publisher-issue-url='https://github.com/gmalanowski/Pascal-builds/issues' \
-      --sudo-off \
-    && grep -E 'CMAKE_CUDA_COMPILER:FILEPATH|CMAKE_CUDA_COMPILER_VERSION|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA' build/CMakeCache.txt || true \
-    && ./scripts/linux_build.sh --step=validation --sudo-off \
-    && ./scripts/linux_build.sh --step=build --sudo-off \
-    && ./scripts/linux_build.sh --step=package --sudo-off
+      --sudo-off; \
+    grep -E 'CMAKE_CUDA_COMPILER:FILEPATH|CMAKE_CUDA_COMPILER_VERSION|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA' build/CMakeCache.txt || true; \
+    ./scripts/linux_build.sh --step=validation --sudo-off; \
+    ./scripts/linux_build.sh --step=build --sudo-off; \
+    ./scripts/linux_build.sh --step=package --sudo-off
 
 RUN test -s build/cpack_artifacts/Sunshine.deb \
-    && dpkg-deb --info build/cpack_artifacts/Sunshine.deb >/dev/null \
-    && (strings build/sunshine | grep -q 'NvFBC' || true)
+    && dpkg-deb --info build/cpack_artifacts/Sunshine.deb >/dev/null
 
 FROM scratch AS artifact
 COPY --from=build /build/Sunshine/build/cpack_artifacts/Sunshine.deb /sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb
