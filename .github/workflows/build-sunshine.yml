@@ -1,0 +1,64 @@
+name: Build Sunshine compatibility package
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: Sunshine release tag or commit
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare names
+        id: meta
+        env:
+          REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          safe_ref="$(printf '%s' "$REF" | tr '/:@ ' '----')"
+          echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
+          echo "marker=sunshine-${safe_ref}-candidate" >> "$GITHUB_OUTPUT"
+
+      - name: Build Ubuntu 22.04 compatibility package
+        env:
+          REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          rm -rf out
+          mkdir -p out
+          docker build \
+            --build-arg SUNSHINE_REF="$REF" \
+            --file sunshine/Dockerfile \
+            --target artifact \
+            --output type=local,dest=out \
+            .
+
+      - name: Verify package
+        run: |
+          set -euo pipefail
+          test -s out/sunshine-ubuntu22-x86_64.deb
+          dpkg-deb --info out/sunshine-ubuntu22-x86_64.deb
+          sha256sum out/sunshine-ubuntu22-x86_64.deb | tee out/SHA256SUMS
+
+      - name: Create candidate release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MARKER: ${{ steps.meta.outputs.marker }}
+          REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          gh release create "$MARKER" \
+            out/sunshine-ubuntu22-x86_64.deb \
+            out/SHA256SUMS \
+            --title "Sunshine $REF compatibility candidate" \
+            --notes "Automated Ubuntu 22.04/x86-64 compatibility candidate for Sunshine $REF.\n\nThe package is built from source with a generic x86-64 CPU baseline and without the upstream CUDA toolkit dependency.\n\nThis is a candidate build; validate capture/encoding on the target NVIDIA Pascal system before treating it as stable."
