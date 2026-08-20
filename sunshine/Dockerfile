@@ -6,8 +6,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CXXFLAGS="-O2 -march=x86-64 -mtune=generic"
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git \
+    && apt-get install -y --no-install-recommends ca-certificates git software-properties-common \
+    && add-apt-repository ppa:ubuntu-toolchain-r/test -y \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gcc-13 g++-13 \
     && rm -rf /var/lib/apt/lists/*
+
+# CUDA 12.6 supports GCC up to version 13. Sunshine's current Ubuntu 22.04
+# build tooling may select GCC 14, which nvcc 12.6 rejects. Force a supported
+# host compiler explicitly for C, C++, and CUDA host compilation.
+ENV CC=/usr/bin/gcc-13 \
+    CXX=/usr/bin/g++-13 \
+    CUDAHOSTCXX=/usr/bin/g++-13
 
 WORKDIR /build
 # Sunshine relies on a number of git submodules (moonlight-common-c,
@@ -39,14 +49,17 @@ RUN chmod +x scripts/linux_build.sh \
 #
 # Keep the diagnostic grep non-fatal without masking a failed configure step.
 RUN set -e; \
+    gcc-13 --version; \
+    g++-13 --version; \
     nvcc --version; \
+    export CC=/usr/bin/gcc-13 CXX=/usr/bin/g++-13 CUDAHOSTCXX=/usr/bin/g++-13; \
     ./scripts/linux_build.sh \
       --step=cmake \
       --publisher-name='Pascal Builds' \
       --publisher-website='https://github.com/gmalanowski/Pascal-builds' \
       --publisher-issue-url='https://github.com/gmalanowski/Pascal-builds/issues' \
       --sudo-off; \
-    grep -E 'CMAKE_CUDA_COMPILER:FILEPATH|CMAKE_CUDA_COMPILER_VERSION|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA' build/CMakeCache.txt || true; \
+    grep -E 'CMAKE_(C|CXX|CUDA)_COMPILER(:FILEPATH)?|CMAKE_CUDA_HOST_COMPILER|CMAKE_CUDA_COMPILER_VERSION|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA' build/CMakeCache.txt || true; \
     ./scripts/linux_build.sh --step=validation --sudo-off; \
     ./scripts/linux_build.sh --step=build --sudo-off; \
     ./scripts/linux_build.sh --step=package --sudo-off
