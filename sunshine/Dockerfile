@@ -62,7 +62,12 @@ RUN set -e; \
     grep -Eq 'sm_61|compute_61' build/build.ninja || { echo 'ERROR: generated CUDA rules do not contain Pascal compute capability 6.1'; exit 1; }; \
     echo "Checking CPU baseline..."; \
     grep -q -- '-march=x86-64' build/build.ninja || { echo 'ERROR: generic x86-64 CPU baseline flag is missing'; exit 1; }; \
-    if grep -Eq -- '-march=native|-mavx2|-mfma' build/build.ninja; then echo 'ERROR: generated build contains CPU flags unsupported by the Ivy Bridge target'; exit 1; fi; \
+    if grep -Eq -- '-march=native|-mavx2|-mfma' build/build.ninja; then \
+      echo 'Unsupported CPU flag occurrences in build.ninja:'; \
+      grep -En -- '-march=native|-mavx2|-mfma' build/build.ninja | head -n 80; \
+      echo 'ERROR: generated build contains CPU flags unsupported by the Ivy Bridge target'; \
+      exit 1; \
+    fi; \
     ./scripts/linux_build.sh --step=validation --sudo-off; \
     ./scripts/linux_build.sh --step=build --sudo-off; \
     ./scripts/linux_build.sh --step=package --sudo-off
