@@ -25,32 +25,27 @@ RUN git clone https://github.com/LizardByte/Sunshine.git \
 
 WORKDIR /build/Sunshine
 
-# Install non-CUDA dependencies with upstream tooling. The script may switch
-# compiler alternatives to its preferred GCC version, so restore GCC 13 after
-# this step for CUDA 12.6 compatibility.
+# Sunshine chooses gcc_version internally from the distro and then overwrites
+# CC/CXX during both dependency installation and CMake configuration. CUDA
+# 12.6 only supports GCC <= 13, so patch the Ubuntu 22.04 branch itself before
+# invoking upstream tooling rather than trying to override it afterwards.
+RUN sed -i '/elif grep -q "Ubuntu 22.04"/,/nvm_node=1/ s/gcc_version="14"/gcc_version="13"/' scripts/linux_build.sh \
+    && grep -A7 'elif grep -q "Ubuntu 22.04"' scripts/linux_build.sh | grep -q 'gcc_version="13"'
+
+# CUDA is already provided by the pinned NVIDIA devel image. --skip-cuda is
+# used only for the dependency step so upstream does not download CUDA 13.x.
 RUN chmod +x scripts/linux_build.sh \
     && ./scripts/linux_build.sh \
          --step=deps \
          --ubuntu-test-repo \
          --skip-cuda \
-         --sudo-off \
-    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 130 \
-    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 130 \
-    && update-alternatives --set gcc /usr/bin/gcc-13 \
-    && update-alternatives --set g++ /usr/bin/g++-13
-
-# The selected Sunshine release hard-codes its preferred host compiler into
-# the generated CMake arguments. Patch only that CUDA host-compiler argument so
-# nvcc 12.6 never gets gcc-14. C/C++ compiler selection is also pinned through
-# CC/CXX and update-alternatives above.
-RUN sed -i 's/CMAKE_CUDA_HOST_COMPILER=gcc-14/CMAKE_CUDA_HOST_COMPILER=gcc-13/g' scripts/linux_build.sh
+         --sudo-off
 
 RUN set -e; \
     echo "Host toolchain:"; \
-    gcc --version | head -n1; \
-    g++ --version | head -n1; \
+    gcc-13 --version | head -n1; \
+    g++-13 --version | head -n1; \
     nvcc --version; \
-    export CC=/usr/bin/gcc-13 CXX=/usr/bin/g++-13 CUDAHOSTCXX=/usr/bin/g++-13; \
     ./scripts/linux_build.sh \
       --step=cmake \
       --publisher-name='Pascal Builds' \
@@ -60,11 +55,14 @@ RUN set -e; \
     echo "CMake compiler/CUDA summary:"; \
     grep -E 'CMAKE_(C|CXX|CUDA)_COMPILER(:FILEPATH)?|CMAKE_CUDA_HOST_COMPILER|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA' build/CMakeCache.txt || true; \
     test "$(grep '^SUNSHINE_ENABLE_CUDA:BOOL=' build/CMakeCache.txt | cut -d= -f2)" = "ON"; \
-    ! grep -q 'CMAKE_CUDA_HOST_COMPILER.*gcc-14' build/CMakeCache.txt; \
-    ! grep -q 'CMAKE_C_COMPILER:FILEPATH=/usr/bin/gcc-14' build/CMakeCache.txt; \
-    ! grep -q 'CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/g++-14' build/CMakeCache.txt; \
+    grep '^CMAKE_CUDA_HOST_COMPILER' build/CMakeCache.txt | grep -q 'gcc-13' || { echo 'ERROR: CUDA host compiler is not GCC 13'; exit 1; }; \
+    grep '^CMAKE_C_COMPILER:FILEPATH=' build/CMakeCache.txt | grep -q '/gcc-13$' || { echo 'ERROR: C compiler is not GCC 13'; exit 1; }; \
+    grep '^CMAKE_CXX_COMPILER:FILEPATH=' build/CMakeCache.txt | grep -q '/g++-13$' || { echo 'ERROR: CXX compiler is not G++ 13'; exit 1; }; \
     echo "Checking generated CUDA code for Pascal (sm_61/compute_61)..."; \
-    grep -Eq 'sm_61|compute_61' build/build.ninja; \
+    grep -Eq 'sm_61|compute_61' build/build.ninja || { echo 'ERROR: generated CUDA rules do not contain Pascal compute capability 6.1'; exit 1; }; \
+    echo "Checking CPU baseline..."; \
+    grep -q -- '-march=x86-64' build/build.ninja || { echo 'ERROR: generic x86-64 CPU baseline flag is missing'; exit 1; }; \
+    if grep -Eq -- '-march=native|-mavx2|-mfma' build/build.ninja; then echo 'ERROR: generated build contains CPU flags unsupported by the Ivy Bridge target'; exit 1; fi; \
     ./scripts/linux_build.sh --step=validation --sudo-off; \
     ./scripts/linux_build.sh --step=build --sudo-off; \
     ./scripts/linux_build.sh --step=package --sudo-off
