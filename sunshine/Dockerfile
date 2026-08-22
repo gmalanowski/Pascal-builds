@@ -65,6 +65,13 @@ RUN set -e; \
     if grep -Eq -- '-march=native|-mavx2|-mfma' build/build.ninja; then \
       echo 'Unsupported CPU flag occurrences in build.ninja:'; \
       grep -En -- '-march=native|-mavx2|-mfma' build/build.ninja | head -n 80; \
+      echo 'Context around the first unsupported flag:'; \
+      first_line="$(grep -En -- '-march=native|-mavx2|-mfma' build/build.ninja | head -n1 | cut -d: -f1)"; \
+      start=$((first_line > 12 ? first_line - 12 : 1)); \
+      end=$((first_line + 12)); \
+      sed -n "${start},${end}p" build/build.ninja; \
+      echo 'Matching compile_commands.json entries:'; \
+      grep -n -B2 -A6 -E -- '-march=native|-mavx2|-mfma' build/compile_commands.json | head -n 120 || true; \
       echo 'ERROR: generated build contains CPU flags unsupported by the Ivy Bridge target'; \
       exit 1; \
     fi; \
