@@ -51,10 +51,6 @@ jobs:
           pkg="out/sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb"
           test -s "$pkg"
 
-          # Patching Sunshine sources for compatibility makes upstream's git-based
-          # version detector report 0.0.0-<sha>-dirty. For release tags, restore a
-          # monotonic Debian version so installing a candidate is an upgrade rather
-          # than an accidental downgrade.
           case "$REF" in
             v[0-9]*) deb_version="${REF#v}+pascal1" ;;
             *)       deb_version="0~git-${REF}+pascal1" ;;
@@ -65,9 +61,6 @@ jobs:
           dpkg-deb -R "$pkg" "$work"
           sed -i "s/^Version:.*/Version: ${deb_version}/" "$work/DEBIAN/control"
 
-          # dpkg-deb requires Debian maintainer scripts to be executable. Raw
-          # extraction/repacking can leave these scripts at 0644, so normalize
-          # only the standard executable maintainer hooks before rebuilding.
           for script in preinst postinst prerm postrm config; do
             if [ -f "$work/DEBIAN/$script" ]; then
               chmod 0755 "$work/DEBIAN/$script"
@@ -109,3 +102,22 @@ jobs:
               --title "$title" \
               --notes "$notes"
           fi
+
+      - name: Publish candidate to APT testing
+        env:
+          REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dpkg-dev
+          bash scripts/update-apt-repo.sh testing out/sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apt
+          if git diff --cached --quiet; then
+            echo 'APT testing repository already up to date.'
+            exit 0
+          fi
+          git commit -m "Publish Sunshine $REF to APT testing"
+          git push
