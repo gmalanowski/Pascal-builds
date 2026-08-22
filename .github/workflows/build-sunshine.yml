@@ -120,4 +120,9 @@ jobs:
             exit 0
           fi
           git commit -m "Publish Sunshine $REF to APT testing"
-          git push
+
+          # The build can take long enough for main to move meanwhile.
+          # Rebase the generated APT commit onto the latest main before pushing.
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
