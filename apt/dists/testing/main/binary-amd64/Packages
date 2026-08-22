@@ -15,3 +15,20 @@ Homepage: https://app.lizardbyte.dev/Sunshine
 Description: Self-hosted game stream host for Moonlight
  Self-hosted game stream host for Moonlight
 
+Package: sunshine
+Version: 2026.516.143833+pascal2
+Architecture: amd64
+Maintainer: https://app.lizardbyte.dev
+Installed-Size: 27995
+Depends: debianutils,             libcap2,             libcurl4,             libdrm2,             libgbm1,             libevdev2,             libnuma1,             libopus0,             libpulse0,             libva2,             libva-drm2,             libwayland-client0,             libx11-6,             miniupnpc,             openssl | libssl3,                     libayatana-appindicator3-1,                     libnotify4, libayatana-appindicator3-1 (>= 0.2.96), libc6 (>= 2.38), libcap2 (>= 1:2.10), libcurl4t64 (>= 7.63.0), libdrm2 (>= 2.4.101), libevdev2 (>= 0.9.1), libgbm1 (>= 17.1.0~rc2), libglib2.0-0t64 (>= 2.68.0), libgtk-3-0t64 (>= 3.21.5), libicu74 (>= 74.1-1~), libminiupnpc17 (>= 1.9.20140610), libnotify4 (>= 0.7.0), libnuma1 (>= 2.0.11), libpipewire-0.3-0t64 (>= 0.3.1), libpulse0 (>= 0.99.1), libssl3t64 (>= 3.0.0), libva-drm2 (>= 1.1.0), libva2 (>= 2.9.0), libvulkan1 (>= 1.2.131.2), libwayland-client0 (>= 1.20.0)
+Filename: pool/testing/main/s/sunshine/sunshine_2026.516.143833+pascal2_amd64.deb
+Size: 8527074
+MD5sum: c0637b47079c91203320b90f70b0c8c8
+SHA1: 762862be9f2708d30e646d95d0c7d1734ca45dbe
+SHA256: b01f3030653ff4c178de54c50cc2fa5bd4cd753cad73d07d3810cc49b895ad56
+Section: devel
+Priority: optional
+Homepage: https://app.lizardbyte.dev/Sunshine
+Description: Self-hosted game stream host for Moonlight
+ Self-hosted game stream host for Moonlight
+
