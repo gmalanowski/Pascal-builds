@@ -3,7 +3,7 @@ FROM nvidia/cuda:12.6.3-devel-ubuntu22.04 AS build
 ARG SUNSHINE_REF
 ENV DEBIAN_FRONTEND=noninteractive \
     CFLAGS="-O2 -march=x86-64 -mtune=generic" \
-    CXXFLAGS="-O2 -march=x86-64 -mtune=generic"
+    CXXFLAGS="-O2 -march=x86-64 -mtune=generic -Wno-error=array-bounds"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git software-properties-common \
