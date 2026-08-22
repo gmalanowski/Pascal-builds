@@ -32,6 +32,13 @@ WORKDIR /build/Sunshine
 RUN sed -i '/elif grep -q "Ubuntu 22.04"/,/nvm_node=1/ s/gcc_version="14"/gcc_version="13"/' scripts/linux_build.sh \
     && grep -A7 'elif grep -q "Ubuntu 22.04"' scripts/linux_build.sh | grep -q 'gcc_version="13"'
 
+# Boost.Log automatically adds a dedicated dump_avx2.cpp implementation when
+# the build host supports AVX2. GitHub runners do, but the Ivy Bridge target
+# does not. Pre-seed Boost's configure-test result before dependencies are
+# added so the AVX2 translation unit is not built into the package at all.
+RUN sed -i '/include(${CMAKE_MODULE_PATH}\/dependencies\/common.cmake)/i set(BOOST_LOG_COMPILER_HAS_AVX2 FALSE CACHE BOOL "Disable Boost.Log AVX2 for Ivy Bridge compatibility" FORCE)' CMakeLists.txt \
+    && grep -B1 -A1 'dependencies/common.cmake' CMakeLists.txt | grep -q 'BOOST_LOG_COMPILER_HAS_AVX2 FALSE'
+
 # CUDA is already provided by the pinned NVIDIA devel image. --skip-cuda is
 # used only for the dependency step so upstream does not download CUDA 13.x.
 RUN chmod +x scripts/linux_build.sh \
@@ -53,11 +60,12 @@ RUN set -e; \
       --publisher-issue-url='https://github.com/gmalanowski/Pascal-builds/issues' \
       --sudo-off; \
     echo "CMake compiler/CUDA summary:"; \
-    grep -E 'CMAKE_(C|CXX|CUDA)_COMPILER(:FILEPATH)?|CMAKE_CUDA_HOST_COMPILER|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA' build/CMakeCache.txt || true; \
+    grep -E 'CMAKE_(C|CXX|CUDA)_COMPILER(:FILEPATH)?|CMAKE_CUDA_HOST_COMPILER|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA|BOOST_LOG_COMPILER_HAS_AVX2' build/CMakeCache.txt || true; \
     test "$(grep '^SUNSHINE_ENABLE_CUDA:BOOL=' build/CMakeCache.txt | cut -d= -f2)" = "ON"; \
     grep '^CMAKE_CUDA_HOST_COMPILER' build/CMakeCache.txt | grep -q 'gcc-13' || { echo 'ERROR: CUDA host compiler is not GCC 13'; exit 1; }; \
     grep '^CMAKE_C_COMPILER:FILEPATH=' build/CMakeCache.txt | grep -q '/gcc-13$' || { echo 'ERROR: C compiler is not GCC 13'; exit 1; }; \
     grep '^CMAKE_CXX_COMPILER:FILEPATH=' build/CMakeCache.txt | grep -q '/g++-13$' || { echo 'ERROR: CXX compiler is not G++ 13'; exit 1; }; \
+    grep '^BOOST_LOG_COMPILER_HAS_AVX2:BOOL=FALSE' build/CMakeCache.txt || { echo 'ERROR: Boost.Log AVX2 was not disabled'; exit 1; }; \
     echo "Checking generated CUDA code for Pascal (sm_61/compute_61)..."; \
     grep -Eq 'sm_61|compute_61' build/build.ninja || { echo 'ERROR: generated CUDA rules do not contain Pascal compute capability 6.1'; exit 1; }; \
     echo "Checking CPU baseline..."; \
