@@ -61,9 +61,16 @@ jobs:
           IMAGE: ${{ steps.meta.outputs.image }}
           SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
         run: |
-          gh release create "comfyui-${SAFE_REF}-stable" \
-            --title "ComfyUI $REF stable compatibility build" \
-            --notes "Validated compatibility build. Container: \`$IMAGE:${SAFE_REF}\` (also tagged \`stable\`)."
+          set -euo pipefail
+          tag="comfyui-${SAFE_REF}-stable"
+          title="ComfyUI $REF stable compatibility build"
+          notes="Validated compatibility build. Container: \`$IMAGE:${SAFE_REF}\` (also tagged \`stable\`)."
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --title "$title" --notes "$notes"
+          else
+            gh release create "$tag" --title "$title" --notes "$notes"
+          fi
 
   promote-sunshine:
     if: inputs.project == 'sunshine'
@@ -99,7 +106,7 @@ jobs:
           set -euo pipefail
           tag="sunshine-${SAFE_REF}-stable"
           title="Sunshine $REF stable compatibility build"
-          notes="Validated Ubuntu 22.04/x86-64 compatibility package built from upstream Sunshine $REF."
+          notes="Validated Ubuntu 24.04/x86-64 compatibility package built from upstream Sunshine $REF with CUDA 12.6 for NVIDIA Pascal."
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" artifacts/* --clobber
@@ -116,8 +123,9 @@ jobs:
           REF: ${{ inputs.upstream_ref }}
         run: |
           set -euo pipefail
-          pkg="$(find artifacts -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          pkg="$(find artifacts -maxdepth 1 -type f -name 'sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb' -print -quit)"
           test -n "$pkg"
+          test -s "$pkg"
 
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends dpkg-dev
@@ -131,4 +139,8 @@ jobs:
             exit 0
           fi
           git commit -m "Promote Sunshine $REF to APT stable"
-          git push
+
+          # Main may move between checkout and publication.
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
