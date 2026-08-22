@@ -3,10 +3,18 @@ FROM pytorch/pytorch:2.7.1-cuda12.6-cudnn9-runtime
 ARG COMFYUI_REF
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    CC=/usr/bin/gcc \
+    CXX=/usr/bin/g++
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git libgl1 libglib2.0-0 \
+    && apt-get install -y --no-install-recommends \
+       git \
+       gcc \
+       g++ \
+       libc6-dev \
+       libgl1 \
+       libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt
@@ -26,12 +34,15 @@ RUN sed -i '/^kornia/d' requirements.txt \
 
 RUN python - <<'PY'
 import platform
+import shutil
 import torch
 import kornia
 print('Python:', platform.python_version())
 print('Torch:', torch.__version__)
 print('Kornia:', kornia.__version__)
+print('C compiler:', shutil.which('gcc'))
 assert kornia.__version__.startswith('0.7.1')
+assert shutil.which('gcc')
 PY
 
 EXPOSE 8188
