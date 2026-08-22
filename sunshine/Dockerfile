@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.6.3-devel-ubuntu22.04 AS build
+FROM nvidia/cuda:12.6.3-devel-ubuntu24.04 AS build
 
 ARG SUNSHINE_REF
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -27,10 +27,10 @@ WORKDIR /build/Sunshine
 
 # Sunshine chooses gcc_version internally from the distro and then overwrites
 # CC/CXX during both dependency installation and CMake configuration. CUDA
-# 12.6 only supports GCC <= 13, so patch the Ubuntu 22.04 branch itself before
+# 12.6 only supports GCC <= 13, so patch the Ubuntu 24.04 branch itself before
 # invoking upstream tooling rather than trying to override it afterwards.
-RUN sed -i '/elif grep -q "Ubuntu 22.04"/,/nvm_node=1/ s/gcc_version="14"/gcc_version="13"/' scripts/linux_build.sh \
-    && grep -A7 'elif grep -q "Ubuntu 22.04"' scripts/linux_build.sh | grep -q 'gcc_version="13"'
+RUN sed -i '/elif grep -q "Ubuntu 24.04"/,/nvm_node=1/ s/gcc_version="14"/gcc_version="13"/' scripts/linux_build.sh \
+    && grep -A7 'elif grep -q "Ubuntu 24.04"' scripts/linux_build.sh | grep -q 'gcc_version="13"'
 
 # Boost.Log automatically adds a dedicated dump_avx2.cpp implementation when
 # the build host supports AVX2. GitHub runners do, but the Ivy Bridge target
@@ -100,4 +100,4 @@ RUN test -s build/cpack_artifacts/Sunshine.deb \
     && dpkg-deb --info build/cpack_artifacts/Sunshine.deb >/dev/null
 
 FROM scratch AS artifact
-COPY --from=build /build/Sunshine/build/cpack_artifacts/Sunshine.deb /sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb
+COPY --from=build /build/Sunshine/build/cpack_artifacts/Sunshine.deb /sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb
