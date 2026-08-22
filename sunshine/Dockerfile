@@ -12,18 +12,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc-13 g++-13 \
     && rm -rf /var/lib/apt/lists/*
 
-# CUDA 12.6 supports GCC up to version 13. Sunshine's current Ubuntu 22.04
-# build tooling may select GCC 14, which nvcc 12.6 rejects. Force a supported
-# host compiler explicitly for C, C++, and CUDA host compilation.
 ENV CC=/usr/bin/gcc-13 \
     CXX=/usr/bin/g++-13 \
     CUDAHOSTCXX=/usr/bin/g++-13
 
 WORKDIR /build
-# Sunshine relies on a number of git submodules (moonlight-common-c,
-# Simple-Web-Server, libdisplaydevice, build-deps, etc.). A plain clone leaves
-# those directories empty, so always initialize the exact submodule revisions
-# recorded by the selected upstream release.
 RUN git clone https://github.com/LizardByte/Sunshine.git \
     && cd Sunshine \
     && git checkout --detach "${SUNSHINE_REF}" \
@@ -32,25 +25,30 @@ RUN git clone https://github.com/LizardByte/Sunshine.git \
 
 WORKDIR /build/Sunshine
 
-# Install all non-CUDA dependencies using Sunshine's own build script.
-# CUDA is already provided by the pinned NVIDIA devel base image, so we avoid
-# the script downloading a newer toolkit while still enabling CUDA at configure time.
+# Install non-CUDA dependencies with upstream tooling. The script may switch
+# compiler alternatives to its preferred GCC version, so restore GCC 13 after
+# this step for CUDA 12.6 compatibility.
 RUN chmod +x scripts/linux_build.sh \
     && ./scripts/linux_build.sh \
          --step=deps \
          --ubuntu-test-repo \
          --skip-cuda \
-         --sudo-off
+         --sudo-off \
+    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 130 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 130 \
+    && update-alternatives --set gcc /usr/bin/gcc-13 \
+    && update-alternatives --set g++ /usr/bin/g++-13
 
-# Do NOT pass --skip-cuda from this point onward. The configure step will find
-# nvcc 12.6 from the base image and build SUNSHINE_BUILD_CUDA/NvFBC support.
-# Sunshine upstream includes compute capability 6.1 when CUDA < 13, which is
-# required for Pascal GPUs such as the GTX 1050 Ti.
-#
-# Keep the diagnostic grep non-fatal without masking a failed configure step.
+# The selected Sunshine release hard-codes its preferred host compiler into
+# the generated CMake arguments. Patch only that CUDA host-compiler argument so
+# nvcc 12.6 never gets gcc-14. C/C++ compiler selection is also pinned through
+# CC/CXX and update-alternatives above.
+RUN sed -i 's/CMAKE_CUDA_HOST_COMPILER=gcc-14/CMAKE_CUDA_HOST_COMPILER=gcc-13/g' scripts/linux_build.sh
+
 RUN set -e; \
-    gcc-13 --version; \
-    g++-13 --version; \
+    echo "Host toolchain:"; \
+    gcc --version | head -n1; \
+    g++ --version | head -n1; \
     nvcc --version; \
     export CC=/usr/bin/gcc-13 CXX=/usr/bin/g++-13 CUDAHOSTCXX=/usr/bin/g++-13; \
     ./scripts/linux_build.sh \
@@ -59,7 +57,14 @@ RUN set -e; \
       --publisher-website='https://github.com/gmalanowski/Pascal-builds' \
       --publisher-issue-url='https://github.com/gmalanowski/Pascal-builds/issues' \
       --sudo-off; \
-    grep -E 'CMAKE_(C|CXX|CUDA)_COMPILER(:FILEPATH)?|CMAKE_CUDA_HOST_COMPILER|CMAKE_CUDA_COMPILER_VERSION|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA' build/CMakeCache.txt || true; \
+    echo "CMake compiler/CUDA summary:"; \
+    grep -E 'CMAKE_(C|CXX|CUDA)_COMPILER(:FILEPATH)?|CMAKE_CUDA_HOST_COMPILER|CMAKE_CUDA_ARCHITECTURES|SUNSHINE_ENABLE_CUDA' build/CMakeCache.txt || true; \
+    test "$(grep '^SUNSHINE_ENABLE_CUDA:BOOL=' build/CMakeCache.txt | cut -d= -f2)" = "ON"; \
+    ! grep -q 'CMAKE_CUDA_HOST_COMPILER.*gcc-14' build/CMakeCache.txt; \
+    ! grep -q 'CMAKE_C_COMPILER:FILEPATH=/usr/bin/gcc-14' build/CMakeCache.txt; \
+    ! grep -q 'CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/g++-14' build/CMakeCache.txt; \
+    echo "Checking generated CUDA code for Pascal (sm_61/compute_61)..."; \
+    grep -Eq 'sm_61|compute_61' build/build.ninja; \
     ./scripts/linux_build.sh --step=validation --sudo-off; \
     ./scripts/linux_build.sh --step=build --sudo-off; \
     ./scripts/linux_build.sh --step=package --sudo-off
