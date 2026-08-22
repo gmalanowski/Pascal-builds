@@ -69,11 +69,15 @@ jobs:
     if: inputs.project == 'sunshine'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Prepare names
         id: meta
         env:
           REF: ${{ inputs.upstream_ref }}
         run: |
+          set -euo pipefail
           safe_ref="$(printf '%s' "$REF" | tr '/:@ ' '----')"
           echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
 
@@ -83,7 +87,7 @@ jobs:
           SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
         run: |
           set -euo pipefail
-          mkdir artifacts
+          mkdir -p artifacts
           gh release download "sunshine-${SAFE_REF}-candidate" --dir artifacts
 
       - name: Publish stable package release
@@ -93,7 +97,38 @@ jobs:
           SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
         run: |
           set -euo pipefail
-          gh release create "sunshine-${SAFE_REF}-stable" \
-            artifacts/* \
-            --title "Sunshine $REF stable compatibility build" \
-            --notes "Validated Ubuntu 22.04/x86-64 compatibility package built from upstream Sunshine $REF."
+          tag="sunshine-${SAFE_REF}-stable"
+          title="Sunshine $REF stable compatibility build"
+          notes="Validated Ubuntu 22.04/x86-64 compatibility package built from upstream Sunshine $REF."
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" artifacts/* --clobber
+            gh release edit "$tag" --title "$title" --notes "$notes"
+          else
+            gh release create "$tag" \
+              artifacts/* \
+              --title "$title" \
+              --notes "$notes"
+          fi
+
+      - name: Publish package to APT stable
+        env:
+          REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          pkg="$(find artifacts -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$pkg"
+
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dpkg-dev
+          bash scripts/update-apt-repo.sh stable "$pkg"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apt
+          if git diff --cached --quiet; then
+            echo 'APT stable repository already up to date.'
+            exit 0
+          fi
+          git commit -m "Promote Sunshine $REF to APT stable"
+          git push
