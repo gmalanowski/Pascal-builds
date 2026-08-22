@@ -3,7 +3,7 @@ FROM nvidia/cuda:12.6.3-devel-ubuntu22.04 AS build
 ARG SUNSHINE_REF
 ENV DEBIAN_FRONTEND=noninteractive \
     CFLAGS="-O2 -march=x86-64 -mtune=generic" \
-    CXXFLAGS="-O2 -march=x86-64 -mtune=generic -Wno-error=array-bounds"
+    CXXFLAGS="-O2 -march=x86-64 -mtune=generic"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git software-properties-common \
@@ -38,6 +38,14 @@ RUN sed -i '/elif grep -q "Ubuntu 22.04"/,/nvm_node=1/ s/gcc_version="14"/gcc_ve
 # added so the AVX2 translation unit is not built into the package at all.
 RUN sed -i '/include(${CMAKE_MODULE_PATH}\/dependencies\/common.cmake)/i set(BOOST_LOG_COMPILER_HAS_AVX2 FALSE CACHE BOOL "Disable Boost.Log AVX2 for Ivy Bridge compatibility" FORCE)' CMakeLists.txt \
     && grep -B1 -A1 'dependencies/common.cmake' CMakeLists.txt | grep -q 'BOOST_LOG_COMPILER_HAS_AVX2 FALSE'
+
+# GCC 13 emits a known false-positive array-bounds warning in libstdc++ while
+# compiling Sunshine's Linux graphics tests. Upstream enables -Werror through
+# SUNSHINE_COMPILE_OPTIONS, which is appended after environment CXXFLAGS, so
+# disabling the error via CXXFLAGS is ineffective. Add the narrow exception
+# directly after upstream's -Werror so only this warning remains non-fatal.
+RUN sed -i '/list(APPEND SUNSHINE_COMPILE_OPTIONS -Werror)/a\    list(APPEND SUNSHINE_COMPILE_OPTIONS -Wno-error=array-bounds)' cmake/compile_definitions/common.cmake \
+    && grep -A1 'SUNSHINE_COMPILE_OPTIONS -Werror' cmake/compile_definitions/common.cmake | grep -q 'Wno-error=array-bounds'
 
 # CUDA is already provided by the pinned NVIDIA devel image. --skip-cuda is
 # used only for the dependency step so upstream does not download CUDA 13.x.
@@ -83,6 +91,7 @@ RUN set -e; \
       echo 'ERROR: generated build contains CPU flags unsupported by the Ivy Bridge target'; \
       exit 1; \
     fi; \
+    grep -q -- '-Wno-error=array-bounds' build/build.ninja || { echo 'ERROR: GCC 13 array-bounds exception was not propagated to generated compile rules'; exit 1; }; \
     ./scripts/linux_build.sh --step=validation --sudo-off; \
     ./scripts/linux_build.sh --step=build --sudo-off; \
     ./scripts/linux_build.sh --step=package --sudo-off
