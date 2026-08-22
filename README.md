@@ -19,11 +19,36 @@ The ComfyUI pipeline builds a conservative CUDA 12.6 image for Pascal-era GPUs. 
 
 ### Sunshine
 
-The Sunshine pipeline tracks stable releases and builds Linux packages from source using upstream build tooling where possible. It is intentionally kept independent from any deployment target.
+The Sunshine pipeline builds Ubuntu 22.04/x86-64 packages with CUDA 12.6, GCC 13 and Pascal compute capability 6.1 support. Candidate packages are published to the APT `testing` suite; validated packages are promoted manually to `stable`.
+
+## APT repository
+
+The repository is intentionally unsigned for now, so clients use `trusted=yes`. A repository signing key can be added later.
+
+Candidate/testing channel:
+
+```text
+deb [trusted=yes] https://raw.githubusercontent.com/gmalanowski/Pascal-builds/main/apt testing main
+```
+
+Validated/stable channel:
+
+```text
+deb [trusted=yes] https://raw.githubusercontent.com/gmalanowski/Pascal-builds/main/apt stable main
+```
+
+After adding one of the sources, use normal APT commands:
+
+```bash
+sudo apt update
+sudo apt install sunshine
+```
+
+Do not enable both channels on the same machine unless you intentionally want APT pinning or version selection between testing and stable.
 
 ## Release model
 
-New upstream stable versions are detected automatically. Builds are published as **candidate** artifacts first. Promotion to a stable deployment remains explicit/manual until the build has been validated on real target hardware.
+New upstream stable versions are detected automatically. Builds are published as **candidate** artifacts first. Promotion to a stable deployment remains explicit/manual until the build has been validated on real target hardware. Sunshine candidates also enter APT `testing`; the manual promotion workflow publishes the validated package to APT `stable`.
 
 ## Security
 
@@ -32,5 +57,5 @@ All CI runs on GitHub-hosted runners. This repository has no deployment credenti
 ## Target baseline
 
 - NVIDIA Pascal / compute capability 6.1 class hardware
-- CUDA 12.6 runtime for ComfyUI
+- CUDA 12.6 runtime/toolchain where required
 - x86-64 CPUs without AVX2, including Intel Ivy Bridge, where dependencies permit it
