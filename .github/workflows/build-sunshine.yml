@@ -64,6 +64,16 @@ jobs:
           trap 'rm -rf "$work"' EXIT
           dpkg-deb -R "$pkg" "$work"
           sed -i "s/^Version:.*/Version: ${deb_version}/" "$work/DEBIAN/control"
+
+          # dpkg-deb requires Debian maintainer scripts to be executable. Raw
+          # extraction/repacking can leave these scripts at 0644, so normalize
+          # only the standard executable maintainer hooks before rebuilding.
+          for script in preinst postinst prerm postrm config; do
+            if [ -f "$work/DEBIAN/$script" ]; then
+              chmod 0755 "$work/DEBIAN/$script"
+            fi
+          done
+
           dpkg-deb -b "$work" "$pkg" >/dev/null
           echo "Normalized package version: $deb_version"
 
