@@ -1,0 +1,61 @@
+name: Publish Sunshine candidate to APT testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: Sunshine release tag already published as candidate
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish-testing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare release name
+        id: meta
+        env:
+          REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          safe_ref="$(printf '%s' "$REF" | tr '/:@ ' '----')"
+          echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Download candidate package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          gh release download "sunshine-${SAFE_REF}-candidate" \
+            --dir artifacts \
+            --pattern 'sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb'
+
+      - name: Update APT testing repository
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dpkg-dev
+          bash scripts/update-apt-repo.sh testing artifacts/sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb
+
+      - name: Commit APT repository
+        env:
+          REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apt
+          if git diff --cached --quiet; then
+            echo 'APT repository already up to date.'
+            exit 0
+          fi
+          git commit -m "Publish Sunshine $REF to APT testing"
+          git push
