@@ -29,7 +29,7 @@ jobs:
           echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
           echo "marker=sunshine-${safe_ref}-candidate" >> "$GITHUB_OUTPUT"
 
-      - name: Build Ubuntu 22.04 / CUDA 12.6 Pascal package
+      - name: Build Ubuntu 24.04 / CUDA 12.6 Pascal package
         env:
           REF: ${{ inputs.upstream_ref }}
         run: |
@@ -48,12 +48,12 @@ jobs:
           REF: ${{ inputs.upstream_ref }}
         run: |
           set -euo pipefail
-          pkg="out/sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb"
+          pkg="out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb"
           test -s "$pkg"
 
           case "$REF" in
-            v[0-9]*) deb_version="${REF#v}+pascal1" ;;
-            *)       deb_version="0~git-${REF}+pascal1" ;;
+            v[0-9]*) deb_version="${REF#v}+pascal2" ;;
+            *)       deb_version="0~git-${REF}+pascal2" ;;
           esac
 
           work="$(mktemp -d)"
@@ -73,7 +73,7 @@ jobs:
       - name: Verify package
         run: |
           set -euo pipefail
-          pkg="out/sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb"
+          pkg="out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb"
           test -s "$pkg"
           dpkg-deb --info "$pkg"
           sha256sum "$pkg" | tee out/SHA256SUMS
@@ -86,18 +86,18 @@ jobs:
         run: |
           set -euo pipefail
           title="Sunshine $REF Pascal/CUDA 12.6 candidate"
-          notes="Automated Ubuntu 22.04/x86-64 compatibility candidate for Sunshine $REF.\n\nBuilt against CUDA 12.6.3 specifically to retain CUDA/NvFBC support for NVIDIA Pascal (compute capability 6.1), while keeping a generic x86-64 CPU baseline for older CPUs. Sunshine upstream includes Pascal CUDA architectures when the compiler is CUDA < 13.\n\nThis is a candidate build; validate NVIDIA capture/encoding on the target Pascal system before treating it as stable."
+          notes="Automated Ubuntu 24.04/x86-64 compatibility candidate for Sunshine $REF.\n\nBuilt against CUDA 12.6.3 specifically to retain CUDA/NvFBC support for NVIDIA Pascal (compute capability 6.1), while keeping a generic x86-64 CPU baseline for older CPUs. Sunshine upstream includes Pascal CUDA architectures when the compiler is CUDA < 13.\n\nThis is a candidate build; validate NVIDIA capture/encoding on the target Pascal system before treating it as stable."
 
           if gh release view "$MARKER" >/dev/null 2>&1; then
             echo "Candidate release already exists; replacing its assets."
             gh release upload "$MARKER" \
-              out/sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb \
+              out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb \
               out/SHA256SUMS \
               --clobber
             gh release edit "$MARKER" --title "$title" --notes "$notes"
           else
             gh release create "$MARKER" \
-              out/sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb \
+              out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb \
               out/SHA256SUMS \
               --title "$title" \
               --notes "$notes"
@@ -110,7 +110,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends dpkg-dev
-          bash scripts/update-apt-repo.sh testing out/sunshine-ubuntu22-cuda12.6-pascal-x86_64.deb
+          bash scripts/update-apt-repo.sh testing out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
