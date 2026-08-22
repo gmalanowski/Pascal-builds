@@ -74,7 +74,7 @@ jobs:
           SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
         run: docker push "$IMAGE:${SAFE_REF}-candidate"
 
-      - name: Create candidate marker release
+      - name: Create or update candidate marker release
         env:
           GH_TOKEN: ${{ github.token }}
           MARKER: ${{ steps.meta.outputs.marker }}
@@ -83,6 +83,12 @@ jobs:
           SAFE_REF: ${{ steps.meta.outputs.safe_ref }}
         run: |
           set -euo pipefail
-          gh release create "$MARKER" \
-            --title "ComfyUI $REF candidate" \
-            --notes "Automated compatibility candidate for ComfyUI $REF.\n\nContainer: \`$IMAGE:${SAFE_REF}-candidate\`\n\nTarget: NVIDIA Pascal-era GPUs with CUDA 12.6 and older x86-64 CPUs without an AVX2 requirement from Kornia.\n\nThis is a candidate build; validate it on target hardware before treating it as stable."
+          title="ComfyUI $REF candidate"
+          notes="Automated compatibility candidate for ComfyUI $REF.\n\nContainer: \`$IMAGE:${SAFE_REF}-candidate\`\n\nTarget: NVIDIA Pascal-era GPUs with CUDA 12.6 and older x86-64 CPUs without an AVX2 requirement from Kornia.\n\nThis is a candidate build; validate it on target hardware before treating it as stable."
+
+          if gh release view "$MARKER" >/dev/null 2>&1; then
+            echo "Candidate release already exists; updating metadata."
+            gh release edit "$MARKER" --title "$title" --notes "$notes"
+          else
+            gh release create "$MARKER" --title "$title" --notes "$notes"
+          fi
