@@ -14,8 +14,8 @@ on:
         type: string
 
 concurrency:
-  group: sunshine-build-${{ inputs.upstream_ref }}
-  cancel-in-progress: false
+  group: sunshine-build-${{ github.ref }}-${{ inputs.upstream_ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: write
@@ -95,6 +95,15 @@ jobs:
           dpkg-deb --info "$pkg"
           done
           (cd out && sha256sum *.deb) | tee out/SHA256SUMS
+
+      - name: Upload tested packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunshine-pascal-packages
+          path: |
+            out/*.deb
+            out/SHA256SUMS
+          if-no-files-found: error
 
       - name: Publish candidate release
         if: github.event_name == 'workflow_dispatch'
