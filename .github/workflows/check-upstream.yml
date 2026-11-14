@@ -29,6 +29,7 @@ jobs:
       - name: Read latest stable release
         id: release
         env:
+          GH_TOKEN: ${{ github.token }}
           UPSTREAM: ${{ matrix.upstream }}
         run: |
           set -euo pipefail

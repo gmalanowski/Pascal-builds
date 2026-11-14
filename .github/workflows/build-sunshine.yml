@@ -31,6 +31,7 @@ jobs:
       - name: Prepare names
         id: meta
         env:
+          GH_TOKEN: ${{ github.token }}
           REF: ${{ inputs.upstream_ref }}
         run: |
           set -euo pipefail
