@@ -17,6 +17,29 @@ def prepare(root):
     source = source.replace('appstream-util validate "', 'appstream-util validate --nonet "')
     path.write_text(source)
 
+    # GCC 13 lacks C++23 ranges::to. This expression is only used to format
+    # a diagnostic string; preserve the exact separator behavior, including
+    # empty display names, without changing capture/encoding code.
+    kms = root / "src/platform/linux/kmsgrab.cpp"
+    if kms.exists():
+        text = kms.read_text()
+        expression = "(display_names | std::views::join_with(' ') | std::ranges::to<std::string>())"
+        replacement = """([&]() {
+      std::string joined;
+      bool first = true;
+      for (const auto &name : display_names) {
+        if (!first) {
+          joined += ' ';
+        }
+        joined += name;
+        first = false;
+      }
+      return joined;
+    }())"""
+        if 'std::ranges::to' in text and text.count(expression) != 1:
+            raise ValueError("Upstream KMS ranges expression changed")
+        kms.write_text(text.replace(expression, replacement))
+
 
 
 if __name__ == "__main__":

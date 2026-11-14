@@ -41,6 +41,21 @@ class CompatibilityTests(unittest.TestCase):
             self.assertIn('appstream-util validate --nonet "metadata.xml"', source)
             self.assertIn('desktop-file-validate "app.desktop"', source)
 
+    def test_kms_join_preserves_output_without_cpp23_ranges(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'scripts').mkdir()
+            (root / 'scripts/linux_build.sh').write_text('architecture=$(uname -m)\n')
+            kms = root / 'src/platform/linux/kmsgrab.cpp'
+            kms.parent.mkdir(parents=True)
+            expression = "(display_names | std::views::join_with(' ') | std::ranges::to<std::string>())"
+            kms.write_text('#include <string>\n#include <vector>\n#include <cassert>\nstd::string join(const std::vector<std::string>& display_names) { return ' + expression + '; }\nint main() { assert(join({}) == ""); assert(join({""}) == ""); assert(join({"", ""}) == " "); assert(join({"A", "B"}) == "A B"); assert(join({"A", "", "C"}) == "A  C"); }\n')
+            prepare_source.prepare(root)
+            self.assertNotIn('std::ranges::to', kms.read_text())
+            binary = root / 'join-test'
+            subprocess.run(['g++', '-std=c++17', '-Wall', '-Wextra', '-Werror', str(kms), '-o', str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
+
     def test_distribution_apt_suites_remain_separate(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
