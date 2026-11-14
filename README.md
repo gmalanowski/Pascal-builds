@@ -19,7 +19,7 @@ The ComfyUI pipeline builds a conservative CUDA 12.6 image for Pascal-era GPUs. 
 
 ### Sunshine
 
-The Sunshine pipeline builds Ubuntu 22.04/x86-64 packages with CUDA 12.6, GCC 13 and Pascal compute capability 6.1 support. Candidate packages are published to the APT `testing` suite; validated packages are promoted manually to `stable`.
+The Sunshine pipeline builds Ubuntu 24.04 and 26.04/x86-64 packages with CUDA 12.6, GCC 13 and Pascal compute capability 6.1 support. Candidate packages are published to the APT `testing` suite; validated packages are promoted manually to `stable`.
 
 ## APT repository
 
@@ -59,3 +59,13 @@ All CI runs on GitHub-hosted runners. This repository has no deployment credenti
 - NVIDIA Pascal / compute capability 6.1 class hardware
 - CUDA 12.6 runtime/toolchain where required
 - x86-64 CPUs without AVX2, including Intel Ivy Bridge, where dependencies permit it
+
+### Ubuntu 26.04 packages
+
+Use suite `testing-ubuntu26` (or `stable-ubuntu26` after explicit hardware validation)
+instead of `testing`/`stable`. Ubuntu 24.04 retains the existing suites. Do not mix
+the suites: packages are built against each distribution's native libraries.
+Both builds retain CUDA 12.6 and GCC 13 for Pascal. The binary receives upstream
+`BUILD_VERSION`/`BRANCH` metadata, so its web interface reports the release version
+rather than `0.0.0-<commit>-dirty`. Compatibility patches remain in the source;
+release notes and the package suffix identify this downstream build.

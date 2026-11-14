@@ -1,12 +1,21 @@
 name: Build Sunshine compatibility package
 
 on:
+  pull_request:
+    paths:
+      - 'sunshine/**'
+      - 'scripts/**'
+      - '.github/workflows/build-sunshine.yml'
   workflow_dispatch:
     inputs:
       upstream_ref:
-        description: Sunshine release tag or commit
+        description: Stable Sunshine release tag
         required: true
         type: string
+
+concurrency:
+  group: sunshine-build-${{ inputs.upstream_ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -25,35 +34,41 @@ jobs:
           REF: ${{ inputs.upstream_ref }}
         run: |
           set -euo pipefail
+          if [ -z "$REF" ]; then
+            REF="$(python3 scripts/latest-release.py LizardByte/Sunshine | jq -r .tag_name)"
+          fi
+          [[ "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected a stable Sunshine release tag'; exit 1; }
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
           safe_ref="$(printf '%s' "$REF" | tr '/:@ ' '----')"
           echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
           echo "marker=sunshine-${safe_ref}-candidate" >> "$GITHUB_OUTPUT"
 
-      - name: Build Ubuntu 24.04 / CUDA 12.6 Pascal package
+      - name: Build Ubuntu 24.04 and 26.04 / CUDA 12.6 Pascal packages
         env:
-          REF: ${{ inputs.upstream_ref }}
+          REF: ${{ steps.meta.outputs.ref }}
         run: |
           set -euo pipefail
-          rm -rf out
           mkdir -p out
-          docker build \
-            --build-arg SUNSHINE_REF="$REF" \
-            --file sunshine/Dockerfile \
-            --target artifact \
-            --output type=local,dest=out \
-            .
+          for ubuntu in 24.04 26.04; do
+            docker build \
+              --build-arg SUNSHINE_REF="$REF" \
+              --build-arg UBUNTU_VERSION="$ubuntu" \
+              --file sunshine/Dockerfile --target artifact \
+              --output "type=local,dest=out/$ubuntu" .
+            mv "out/$ubuntu/Sunshine.deb" "out/sunshine-ubuntu${ubuntu%%.*}-cuda12.6-pascal-x86_64.deb"
+          done
 
       - name: Normalize Debian package version
         env:
-          REF: ${{ inputs.upstream_ref }}
+          REF: ${{ steps.meta.outputs.ref }}
         run: |
           set -euo pipefail
-          pkg="out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb"
+          for pkg in out/*.deb; do
           test -s "$pkg"
 
           case "$REF" in
-            v[0-9]*) deb_version="${REF#v}+pascal2" ;;
-            *)       deb_version="0~git-${REF}+pascal2" ;;
+            v[0-9]*) deb_version="${REF#v}+pascal3" ;;
+            *)       deb_version="0~git-${REF}+pascal3" ;;
           esac
 
           work="$(mktemp -d)"
@@ -68,49 +83,55 @@ jobs:
           done
 
           dpkg-deb -b "$work" "$pkg" >/dev/null
+          rm -rf "$work"
           echo "Normalized package version: $deb_version"
+          done
 
       - name: Verify package
         run: |
           set -euo pipefail
-          pkg="out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb"
+          for pkg in out/*.deb; do
           test -s "$pkg"
           dpkg-deb --info "$pkg"
-          sha256sum "$pkg" | tee out/SHA256SUMS
+          done
+          (cd out && sha256sum *.deb) | tee out/SHA256SUMS
 
       - name: Publish candidate release
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
           MARKER: ${{ steps.meta.outputs.marker }}
-          REF: ${{ inputs.upstream_ref }}
+          REF: ${{ steps.meta.outputs.ref }}
         run: |
           set -euo pipefail
           title="Sunshine $REF Pascal/CUDA 12.6 candidate"
-          notes="Automated Ubuntu 24.04/x86-64 compatibility candidate for Sunshine $REF.\n\nBuilt against CUDA 12.6.3 specifically to retain CUDA/NvFBC support for NVIDIA Pascal (compute capability 6.1), while keeping a generic x86-64 CPU baseline for older CPUs. Sunshine upstream includes Pascal CUDA architectures when the compiler is CUDA < 13.\n\nThis is a candidate build; validate NVIDIA capture/encoding on the target Pascal system before treating it as stable."
+          notes="Automated Ubuntu 24.04 and 26.04/x86-64 compatibility candidate for Sunshine $REF.\n\nBuilt against CUDA 12.6.3 specifically to retain CUDA/NvFBC support for NVIDIA Pascal (compute capability 6.1), while keeping a generic x86-64 CPU baseline for older CPUs. Sunshine upstream includes Pascal CUDA architectures when the compiler is CUDA < 13.\n\nThis is a candidate build; validate NVIDIA capture/encoding on the target Pascal system before treating it as stable."
 
           if gh release view "$MARKER" >/dev/null 2>&1; then
             echo "Candidate release already exists; replacing its assets."
             gh release upload "$MARKER" \
-              out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb \
+              out/*.deb \
               out/SHA256SUMS \
               --clobber
             gh release edit "$MARKER" --title "$title" --notes "$notes"
           else
             gh release create "$MARKER" \
-              out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb \
+              out/*.deb \
               out/SHA256SUMS \
               --title "$title" \
               --notes "$notes"
           fi
 
       - name: Publish candidate to APT testing
+        if: github.event_name == 'workflow_dispatch'
         env:
-          REF: ${{ inputs.upstream_ref }}
+          REF: ${{ steps.meta.outputs.ref }}
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends dpkg-dev
           bash scripts/update-apt-repo.sh testing out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb
+          bash scripts/update-apt-repo.sh testing-ubuntu26 out/sunshine-ubuntu26-cuda12.6-pascal-x86_64.deb
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'

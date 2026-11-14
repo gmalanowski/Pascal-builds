@@ -106,7 +106,7 @@ jobs:
           set -euo pipefail
           tag="sunshine-${SAFE_REF}-stable"
           title="Sunshine $REF stable compatibility build"
-          notes="Validated Ubuntu 24.04/x86-64 compatibility package built from upstream Sunshine $REF with CUDA 12.6 for NVIDIA Pascal."
+          notes="Validated Ubuntu 24.04 and 26.04/x86-64 compatibility package built from upstream Sunshine $REF with CUDA 12.6 for NVIDIA Pascal."
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" artifacts/* --clobber
@@ -130,6 +130,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends dpkg-dev
           bash scripts/update-apt-repo.sh stable "$pkg"
+          bash scripts/update-apt-repo.sh stable-ubuntu26 artifacts/sunshine-ubuntu26-cuda12.6-pascal-x86_64.deb
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
