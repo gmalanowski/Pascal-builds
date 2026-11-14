@@ -11,6 +11,10 @@ def prepare(root):
     if source.count(anchor) != 1:
         raise ValueError("Upstream distro-detection anchor changed")
     source = source.replace(anchor, 'gcc_version="13"\ncuda_system_package=0\n' + anchor)
+    # Validate metadata offline: a remote screenshot outage must not block a
+    # package build. Keep both validators and desktop-file validation enabled.
+    source = source.replace('appstreamcli validate "', 'appstreamcli validate --no-net "')
+    source = source.replace('appstream-util validate "', 'appstream-util validate --nonet "')
     path.write_text(source)
 
 

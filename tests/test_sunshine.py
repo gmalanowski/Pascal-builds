@@ -29,6 +29,18 @@ class CompatibilityTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'anchor changed'):
                 prepare_source.prepare(root)
 
+    def test_metadata_validation_keeps_checks_offline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'scripts').mkdir()
+            script = root / 'scripts/linux_build.sh'
+            script.write_text('architecture=$(uname -m)\nappstreamcli validate "metadata.xml"\nappstream-util validate "metadata.xml"\ndesktop-file-validate "app.desktop"\n')
+            prepare_source.prepare(root)
+            source = script.read_text()
+            self.assertIn('appstreamcli validate --no-net "metadata.xml"', source)
+            self.assertIn('appstream-util validate --nonet "metadata.xml"', source)
+            self.assertIn('desktop-file-validate "app.desktop"', source)
+
     def test_distribution_apt_suites_remain_separate(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
