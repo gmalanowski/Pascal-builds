@@ -107,8 +107,15 @@ RUN set -e; \
     ./scripts/linux_build.sh --step=build --sudo-off; \
     ./scripts/linux_build.sh --step=package --sudo-off
 
-RUN test -s build/cpack_artifacts/Sunshine.deb \
-    && dpkg-deb --info build/cpack_artifacts/Sunshine.deb >/dev/null
+# CPack names release builds sunshine_<version>_amd64.deb, while older
+# builds used Sunshine.deb. Export exactly one verified package under a
+# stable artifact name rather than relying on either upstream filename.
+RUN set -e; \
+    set -- build/cpack_artifacts/*.deb; \
+    test "$#" -eq 1; \
+    test -s "$1"; \
+    dpkg-deb --info "$1" >/dev/null; \
+    cp "$1" /build/Sunshine.deb
 
 FROM scratch AS artifact
-COPY --from=build /build/Sunshine/build/cpack_artifacts/Sunshine.deb /Sunshine.deb
+COPY --from=build /build/Sunshine.deb /Sunshine.deb

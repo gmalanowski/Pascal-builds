@@ -18,17 +18,21 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu: ['24.04', '26.04']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare names
+      - name: Resolve release
         id: meta
         env:
           GH_TOKEN: ${{ github.token }}
@@ -40,120 +44,98 @@ jobs:
           fi
           [[ "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected a stable Sunshine release tag'; exit 1; }
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
-          safe_ref="$(printf '%s' "$REF" | tr '/:@ ' '----')"
-          echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
-          echo "marker=sunshine-${safe_ref}-candidate" >> "$GITHUB_OUTPUT"
 
-      - name: Build Ubuntu 24.04 and 26.04 / CUDA 12.6 Pascal packages
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Ubuntu ${{ matrix.ubuntu }} / CUDA 12.6 Pascal package
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: sunshine/Dockerfile
+          target: artifact
+          build-args: |
+            SUNSHINE_REF=${{ steps.meta.outputs.ref }}
+            UBUNTU_VERSION=${{ matrix.ubuntu }}
+          outputs: type=local,dest=out
+          cache-from: type=gha,scope=sunshine-ubuntu${{ matrix.ubuntu }}
+          cache-to: type=gha,mode=max,scope=sunshine-ubuntu${{ matrix.ubuntu }}
+
+      - name: Normalize and verify Debian package
         env:
           REF: ${{ steps.meta.outputs.ref }}
+          UBUNTU: ${{ matrix.ubuntu }}
         run: |
           set -euo pipefail
-          mkdir -p out
-          for ubuntu in 24.04 26.04; do
-            docker build \
-              --build-arg SUNSHINE_REF="$REF" \
-              --build-arg UBUNTU_VERSION="$ubuntu" \
-              --file sunshine/Dockerfile --target artifact \
-              --output "type=local,dest=out/$ubuntu" .
-            mv "out/$ubuntu/Sunshine.deb" "out/sunshine-ubuntu${ubuntu%%.*}-cuda12.6-pascal-x86_64.deb"
-          done
-
-      - name: Normalize Debian package version
-        env:
-          REF: ${{ steps.meta.outputs.ref }}
-        run: |
-          set -euo pipefail
-          for pkg in out/*.deb; do
-          test -s "$pkg"
-
-          case "$REF" in
-            v[0-9]*) deb_version="${REF#v}+pascal3" ;;
-            *)       deb_version="0~git-${REF}+pascal3" ;;
-          esac
-
+          pkg="out/sunshine-ubuntu${UBUNTU%%.*}-cuda12.6-pascal-x86_64.deb"
+          mv out/Sunshine.deb "$pkg"
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
           dpkg-deb -R "$pkg" "$work"
-          sed -i "s/^Version:.*/Version: ${deb_version}/" "$work/DEBIAN/control"
-
+          sed -i "s/^Version:.*/Version: ${REF#v}+pascal3/" "$work/DEBIAN/control"
           for script in preinst postinst prerm postrm config; do
-            if [ -f "$work/DEBIAN/$script" ]; then
-              chmod 0755 "$work/DEBIAN/$script"
-            fi
+            if [ -f "$work/DEBIAN/$script" ]; then chmod 0755 "$work/DEBIAN/$script"; fi
           done
-
           dpkg-deb -b "$work" "$pkg" >/dev/null
-          rm -rf "$work"
-          echo "Normalized package version: $deb_version"
-          done
-
-      - name: Verify package
-        run: |
-          set -euo pipefail
-          for pkg in out/*.deb; do
-          test -s "$pkg"
           dpkg-deb --info "$pkg"
-          done
-          (cd out && sha256sum *.deb) | tee out/SHA256SUMS
+          test "$(dpkg-deb -f "$pkg" Version)" = "${REF#v}+pascal3"
 
-      - name: Upload tested packages
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: sunshine-pascal-packages
-          path: |
-            out/*.deb
-            out/SHA256SUMS
+          name: sunshine-ubuntu${{ matrix.ubuntu }}
+          path: out/*.deb
           if-no-files-found: error
 
+  publish:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sunshine-ubuntu*
+          merge-multiple: true
+          path: out
       - name: Publish candidate release
-        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
-          MARKER: ${{ steps.meta.outputs.marker }}
-          REF: ${{ steps.meta.outputs.ref }}
+          REF: ${{ inputs.upstream_ref }}
         run: |
           set -euo pipefail
+          marker="sunshine-${REF}-candidate"
           title="Sunshine $REF Pascal/CUDA 12.6 candidate"
-          notes="Automated Ubuntu 24.04 and 26.04/x86-64 compatibility candidate for Sunshine $REF.\n\nBuilt against CUDA 12.6.3 specifically to retain CUDA/NvFBC support for NVIDIA Pascal (compute capability 6.1), while keeping a generic x86-64 CPU baseline for older CPUs. Sunshine upstream includes Pascal CUDA architectures when the compiler is CUDA < 13.\n\nThis is a candidate build; validate NVIDIA capture/encoding on the target Pascal system before treating it as stable."
+          (cd out && sha256sum *.deb) > out/SHA256SUMS
+          cat > notes.md <<EOF
+          Automated Ubuntu 24.04 and 26.04/x86-64 compatibility candidates for Sunshine $REF.
 
-          if gh release view "$MARKER" >/dev/null 2>&1; then
-            echo "Candidate release already exists; replacing its assets."
-            gh release upload "$MARKER" \
-              out/*.deb \
-              out/SHA256SUMS \
-              --clobber
-            gh release edit "$MARKER" --title "$title" --notes "$notes"
+          Built with CUDA 12.6.3, GCC 13 and compute capability 6.1 for NVIDIA Pascal, with a generic x86-64 CPU baseline. Uses downstream compatibility patches.
+
+          Validate capture/encoding on target hardware before manual stable promotion. Ubuntu 26.04 uses the separate testing-ubuntu26 APT suite; Ubuntu 24.04 retains testing.
+          EOF
+          if gh release view "$marker" >/dev/null 2>&1; then
+            gh release upload "$marker" out/*.deb out/SHA256SUMS --clobber
+            gh release edit "$marker" --title "$title" --notes-file notes.md
           else
-            gh release create "$MARKER" \
-              out/*.deb \
-              out/SHA256SUMS \
-              --title "$title" \
-              --notes "$notes"
+            gh release create "$marker" out/*.deb out/SHA256SUMS --title "$title" --notes-file notes.md
           fi
-
       - name: Publish candidate to APT testing
-        if: github.event_name == 'workflow_dispatch'
         env:
-          REF: ${{ steps.meta.outputs.ref }}
+          REF: ${{ inputs.upstream_ref }}
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends dpkg-dev
           bash scripts/update-apt-repo.sh testing out/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb
           bash scripts/update-apt-repo.sh testing-ubuntu26 out/sunshine-ubuntu26-cuda12.6-pascal-x86_64.deb
-
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add apt
-          if git diff --cached --quiet; then
-            echo 'APT testing repository already up to date.'
-            exit 0
-          fi
+          if git diff --cached --quiet; then exit 0; fi
           git commit -m "Publish Sunshine $REF to APT testing"
-
-          # The build can take long enough for main to move meanwhile.
-          # Rebase the generated APT commit onto the latest main before pushing.
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
