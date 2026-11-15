@@ -86,14 +86,14 @@ release notes and the package suffix identify this downstream build.
 ## APT signing setup
 
 Repository maintainers must configure the `APT_SIGNING_KEY` Actions secret before
-merging the signing change. Generate a dedicated, unencrypted RSA signing key
+merging the signing change. Generate a dedicated, passphrase-protected RSA signing key
 on your own trusted machine (the private key is protected by GitHub Secrets):
 
 ```bash
 gpg --quick-generate-key 'Pascal Builds APT' rsa3072 sign 2y
 ```
 
-When prompted, use an empty passphrase for this dedicated CI key. Back up its
+When prompted, use a strong generated passphrase for this dedicated CI key. Store it separately as the `APT_SIGNING_PASSPHRASE` Actions secret. Back up its
 private key securely. Using the fingerprint printed by GPG, upload directly
 with GitHub CLI (do not paste the private key into chat or commit it):
 
