@@ -82,3 +82,34 @@ Both builds retain CUDA 12.6 and GCC 13 for Pascal. The binary receives upstream
 `BUILD_VERSION`/`BRANCH` metadata, so its web interface reports the release version
 rather than `0.0.0-<commit>-dirty`. Compatibility patches remain in the source;
 release notes and the package suffix identify this downstream build.
+
+## APT signing setup
+
+Repository maintainers must configure the `APT_SIGNING_KEY` Actions secret before
+merging the signing change. Generate a dedicated, unencrypted RSA signing key
+on your own trusted machine (the private key is protected by GitHub Secrets):
+
+```bash
+gpg --quick-generate-key 'Pascal Builds APT' rsa3072 sign 2y
+```
+
+When prompted, use an empty passphrase for this dedicated CI key. Back up its
+private key securely. Using the fingerprint printed by GPG, upload directly
+with GitHub CLI (do not paste the private key into chat or commit it):
+
+```bash
+gpg --armor --export-secret-keys FINGERPRINT | gh secret set APT_SIGNING_KEY --repo gmalanowski/Pascal-builds
+```
+
+After merging, run **Sign existing APT repository** on `main`. This signs every
+existing suite, publishes `apt/pascal-builds.asc`, and prints the public
+fingerprint. Future APT publication signs and verifies all suites before commit;
+a missing secret or signing failure stops publication. Replacing an existing
+public key requires explicit key rotation.
+
+Only after the signatures and public key are published, download the public key
+to `/etc/apt/keyrings/pascal-builds.asc`, verify its fingerprint against your
+locally generated key, and replace `Trusted: yes` in the client `.sources` file
+with `Signed-By: /etc/apt/keyrings/pascal-builds.asc`. Keep `Architectures: amd64`
+and the appropriate suite. Clients then authenticate Release metadata and its
+package-index checksums with this dedicated key.

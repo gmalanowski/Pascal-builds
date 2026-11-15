@@ -120,6 +120,7 @@ jobs:
 
       - name: Publish package to APT stable
         env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
           REF: ${{ inputs.upstream_ref }}
         run: |
           set -euo pipefail
@@ -134,6 +135,7 @@ jobs:
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          bash scripts/sign-apt-repo.sh
           git add apt
           if git diff --cached --quiet; then
             echo 'APT stable repository already up to date.'

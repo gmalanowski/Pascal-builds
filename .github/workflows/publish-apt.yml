@@ -39,12 +39,15 @@ jobs:
             --pattern 'sunshine-ubuntu*-cuda12.6-pascal-x86_64.deb'
 
       - name: Update APT testing repository
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends dpkg-dev
           bash scripts/update-apt-repo.sh testing artifacts/sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb
           bash scripts/update-apt-repo.sh testing-ubuntu26 artifacts/sunshine-ubuntu26-cuda12.6-pascal-x86_64.deb
+          bash scripts/sign-apt-repo.sh
 
       - name: Commit APT repository
         env:
