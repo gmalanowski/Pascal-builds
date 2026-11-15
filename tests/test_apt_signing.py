@@ -15,10 +15,11 @@ class AptSigningTests(unittest.TestCase):
             home = root / 'key'
             home.mkdir(mode=0o700)
             env = dict(os.environ, GNUPGHOME=str(home))
-            subprocess.run(['gpg', '--batch', '--pinentry-mode', 'loopback', '--passphrase', '', '--quick-generate-key', 'CI disposable key', 'rsa2048', 'sign', '1d'], env=env, check=True, capture_output=True)
+            subprocess.run(['gpg', '--batch', '--pinentry-mode', 'loopback', '--passphrase', 'disposable-test-passphrase', '--quick-generate-key', 'CI disposable key', 'rsa2048', 'sign', '1d'], env=env, check=True, capture_output=True)
             try:
-                key = subprocess.check_output(['gpg', '--batch', '--armor', '--export-secret-keys'], env=env, text=True)
+                key = subprocess.check_output(['gpg', '--batch', '--pinentry-mode', 'loopback', '--passphrase', 'disposable-test-passphrase', '--armor', '--export-secret-keys'], env=env, text=True)
                 env['APT_SIGNING_KEY'] = key
+                env['APT_SIGNING_PASSPHRASE'] = 'disposable-test-passphrase'
                 release = root / 'apt/dists/testing/Release'
                 release.parent.mkdir(parents=True)
                 release.write_text('Suite: testing\n')
