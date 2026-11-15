@@ -1,0 +1,34 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+Origin: Pascal Builds
+Label: Pascal Builds
+Suite: testing-ubuntu26
+Codename: testing-ubuntu26
+Architectures: amd64
+Components: main
+Description: Pascal compatibility builds
+Date: Sun, 15 Nov 2026 12:33:26 +0000
+MD5Sum:
+ 24c8602768ff5e88743f5f49f13a4ef8             1499 main/binary-amd64/Packages
+ 9a172305d4e172d5a59e6e5c2a38ffb3              709 main/binary-amd64/Packages.gz
+SHA1:
+ f8df478d85008d52908f95189ce5380a97fe5c6c             1499 main/binary-amd64/Packages
+ 503350539ad44ab078e8187dcdc77e73be51dea1              709 main/binary-amd64/Packages.gz
+SHA256:
+ 82c1cc37a18a2b2f3194cf9918231979afa925820799382ee3d320dc2acff05a             1499 main/binary-amd64/Packages
+ 3c6a44900e7a99e7e0bdc237cd2411dda312cde07afc55f92ed32df91efd2ec6              709 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQGzBAEBCAAdFiEEFpAT39+FmsoQcu3i0wYsiSCk51wFAmr6LFoACgkQ0wYsiSCk
+51xigAv9HSW6EWfn8LwgugcgqLVJ1Ft8/4aGk+dlEqsQxofE1DPkzp7EnWIi85Jm
+P1TynrbHpIENdl/BapYgYuq2iYxokw56fhGkjgUsBjSPzBqiT5xRk59bfwXoNpnD
+Q6rpQGSZgTc6uLywzSIDuBZNx+oAIr06kGtpz4hakQ/hHH7E6zrcX8pDTJV3Riy9
+cHunP7MyH4mFEUdaFMpSM/JkbUJG6S3tIKtmm38RRhVC3EWA5e3zrym5skeTlwhe
+Ep1QaMrL3sAGcMcuN97D4eQzTfvZ/bmxEsxMcjtgsi8+65+jlR4l+QqRQ6QhK/kj
+y2kh8zQl0XvxS0sN3gFbvfW1YzGT4PU/NEuShUAJYNJtPEYOVLPTe5ThxfK4tvLU
+TBTrhvDQSY2HGcb2QSWWJc7Zjzzzhc/X18RuE6wYEbGySYMp20OhLOeWWU7FocNA
+ovnB6AqZOoSDF5BwizvO9VIir5f5UL9Qnyl7TYroS4tr9auRrPg+QlsZmYupapr0
+k529s7Kc
+=0+cI
+-----END PGP SIGNATURE-----

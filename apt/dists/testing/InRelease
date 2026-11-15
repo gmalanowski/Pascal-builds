@@ -1,0 +1,34 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+Origin: Pascal Builds
+Label: Pascal Builds
+Suite: testing
+Codename: testing
+Architectures: amd64
+Components: main
+Description: Pascal compatibility builds
+Date: Sun, 15 Nov 2026 12:33:25 +0000
+MD5Sum:
+ 2c88e87c8b545c3300bced021f57b4dc             4496 main/binary-amd64/Packages
+ 94a9e0021589324ec70e4008db6c0360             1095 main/binary-amd64/Packages.gz
+SHA1:
+ ffe80c21197bc6fa8a00429f4eac927181dc2789             4496 main/binary-amd64/Packages
+ c452736062653e1a22dc018f97ebc866bd7a5ed2             1095 main/binary-amd64/Packages.gz
+SHA256:
+ ea00139bb8b311a5c9ab999f84817c2b427efc045ea28a576d817c76a61990b7             4496 main/binary-amd64/Packages
+ 55bf5e76018eb263719415b7c90801e052da5b4e85dcbcdc44ecde4ae9582291             1095 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQGzBAEBCAAdFiEEFpAT39+FmsoQcu3i0wYsiSCk51wFAmr6LFoACgkQ0wYsiSCk
+51xaqwv6AjgrQnP1ABl7mo0YQiTZ9zQx/UidISRFI9ozjfyJdu1EdxG2Wu02y0bz
+5a4Fjf7jAJ20zO77qNkuPn2e3ECG6xErsLCU5W1Ph7OF2NNCSCkzXmMs+plDsZk1
+/dBCc05M2AX4TG+BSgQrmjGgZk5Y/P6BiaKzb+VjA9hYgBD7744jKbeWCF/PgCZP
+HcPTBd7AzIrpobBNvUHqt0l7ubBh687KWeyZbMzHQarz4ee8QbCnNR7fls/2D4Sj
+iXnSAU0s0HlHhz9wyouYP8rKArpjW5z0ZbG6sVtw7pfz9EXN9zHK74ak4NdDPEvq
+HnOxoG5qYrdAmTgRv7wJYmIInQ2VI/CN1tq/e788YhEACMNFXYEjngV2KfAj3X3y
+M+GUDDgHwjCNubpyXDpmqm1roNu+NjfS45TGFj+RlJIyC/+Vuk0+7FnFNqu4I3l5
+m26iLbVlbayPI1i8IVwoDBWCU/yEEoB6EZOqnrZHHAzrkGhhzrVsNOqRy3o280AQ
+YsT09e+d
+=usVX
+-----END PGP SIGNATURE-----
