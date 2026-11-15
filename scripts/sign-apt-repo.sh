@@ -2,9 +2,13 @@
 set -euo pipefail
 # The private key is supplied only by a GitHub Actions secret, never a tracked file.
 : "${APT_SIGNING_KEY:?Configure the APT_SIGNING_KEY repository secret first}"
+: "${APT_SIGNING_PASSPHRASE:?Configure the APT_SIGNING_PASSPHRASE repository secret first}"
 root="${1:-apt}"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+trap 'gpgconf --kill gpg-agent >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
+umask 077
+printf '%s' "$APT_SIGNING_PASSPHRASE" > "$work/passphrase"
+unset APT_SIGNING_PASSPHRASE
 export GNUPGHOME="$work/gnupg"
 mkdir -m 700 "$GNUPGHOME"
 printf '%s\n' "$APT_SIGNING_KEY" | gpg --batch --quiet --import
@@ -23,8 +27,8 @@ found=false
 for release in "$root"/dists/*/Release; do
   [ -f "$release" ] || continue
   found=true
-  gpg --batch --yes --pinentry-mode loopback --passphrase '' --local-user "$key" --digest-algo SHA256 --clearsign --output "${release%Release}InRelease" "$release"
-  gpg --batch --yes --pinentry-mode loopback --passphrase '' --local-user "$key" --digest-algo SHA256 --armor --detach-sign --output "$release.gpg" "$release"
+  gpg --batch --yes --pinentry-mode loopback --passphrase-file "$work/passphrase" --local-user "$key" --digest-algo SHA256 --clearsign --output "${release%Release}InRelease" "$release"
+  gpg --batch --yes --pinentry-mode loopback --passphrase-file "$work/passphrase" --local-user "$key" --digest-algo SHA256 --armor --detach-sign --output "$release.gpg" "$release"
   gpgv --keyring "$work/public.gpg" "${release%Release}InRelease"
   gpgv --keyring "$work/public.gpg" "$release.gpg" "$release"
 done
