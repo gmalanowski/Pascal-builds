@@ -41,6 +41,7 @@ jobs:
       - name: Update APT testing repository
         env:
           APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          APT_SIGNING_PASSPHRASE: ${{ secrets.APT_SIGNING_PASSPHRASE }}
         run: |
           set -euo pipefail
           sudo apt-get update
