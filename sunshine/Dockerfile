@@ -1,4 +1,11 @@
-FROM nvidia/cuda:12.6.3-devel-ubuntu24.04 AS build
+ARG UBUNTU_VERSION=24.04
+FROM nvidia/cuda:12.6.3-devel-ubuntu24.04 AS cuda
+FROM ubuntu:${UBUNTU_VERSION} AS build
+ARG UBUNTU_VERSION
+COPY --from=cuda /usr/local/cuda-12.6 /usr/local/cuda-12.6
+RUN ln -s cuda-12.6 /usr/local/cuda
+ENV PATH=/usr/local/cuda/bin:${PATH} \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64
 
 ARG SUNSHINE_REF
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -6,7 +13,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CXXFLAGS="-O2 -march=x86-64 -mtune=generic"
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git software-properties-common \
+    && apt-get install -y --no-install-recommends ca-certificates git python3 patch software-properties-common \
     && add-apt-repository ppa:ubuntu-toolchain-r/test -y \
     && apt-get update \
     && apt-get install -y --no-install-recommends gcc-13 g++-13 \
@@ -25,12 +32,14 @@ RUN git clone https://github.com/LizardByte/Sunshine.git \
 
 WORKDIR /build/Sunshine
 
-# Sunshine chooses gcc_version internally from the distro and then overwrites
-# CC/CXX during both dependency installation and CMake configuration. CUDA
-# 12.6 only supports GCC <= 13, so patch the Ubuntu 24.04 branch itself before
-# invoking upstream tooling rather than trying to override it afterwards.
-RUN sed -i '/elif grep -q "Ubuntu 24.04"/,/nvm_node=1/ s/gcc_version="14"/gcc_version="13"/' scripts/linux_build.sh \
-    && grep -A7 'elif grep -q "Ubuntu 24.04"' scripts/linux_build.sh | grep -q 'gcc_version="13"'
+# Override the selected compiler after distro detection, not a distro-specific
+# text fragment: upstream now uses a case statement for Ubuntu versions.
+COPY sunshine/prepare-source.py /tmp/prepare-source.py
+RUN python3 /tmp/prepare-source.py /build/Sunshine \
+    && if [ "$UBUNTU_VERSION" = 26.04 ]; then \
+         patch -p2 --directory=/usr/local/cuda \
+           < packaging/linux/patches/x86_64/cuda-12-math_functions.patch; \
+       fi
 
 # Boost.Log automatically adds a dedicated dump_avx2.cpp implementation when
 # the build host supports AVX2. GitHub runners do, but the Ivy Bridge target
@@ -57,6 +66,8 @@ RUN chmod +x scripts/linux_build.sh \
          --sudo-off
 
 RUN set -e; \
+    export BRANCH=master BUILD_VERSION="${SUNSHINE_REF}"; \
+    export COMMIT="$(git rev-parse HEAD)" TAG="${SUNSHINE_REF}"; \
     echo "Host toolchain:"; \
     gcc-13 --version | head -n1; \
     g++-13 --version | head -n1; \
@@ -96,8 +107,15 @@ RUN set -e; \
     ./scripts/linux_build.sh --step=build --sudo-off; \
     ./scripts/linux_build.sh --step=package --sudo-off
 
-RUN test -s build/cpack_artifacts/Sunshine.deb \
-    && dpkg-deb --info build/cpack_artifacts/Sunshine.deb >/dev/null
+# CPack names release builds sunshine_<version>_amd64.deb, while older
+# builds used Sunshine.deb. Export exactly one verified package under a
+# stable artifact name rather than relying on either upstream filename.
+RUN set -e; \
+    set -- build/cpack_artifacts/*.deb; \
+    test "$#" -eq 1; \
+    test -s "$1"; \
+    dpkg-deb --info "$1" >/dev/null; \
+    cp "$1" /build/Sunshine.deb
 
 FROM scratch AS artifact
-COPY --from=build /build/Sunshine/build/cpack_artifacts/Sunshine.deb /sunshine-ubuntu24-cuda12.6-pascal-x86_64.deb
+COPY --from=build /build/Sunshine.deb /Sunshine.deb

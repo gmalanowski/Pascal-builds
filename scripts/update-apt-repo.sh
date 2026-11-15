@@ -5,7 +5,7 @@ suite="${1:?usage: update-apt-repo.sh <testing|stable> <package.deb>}"
 pkg="${2:?usage: update-apt-repo.sh <testing|stable> <package.deb>}"
 
 case "$suite" in
-  testing|stable) ;;
+  testing|stable|testing-ubuntu26|stable-ubuntu26) ;;
   *) echo "Unsupported suite: $suite" >&2; exit 2 ;;
 esac
 
