@@ -15,6 +15,7 @@ jobs:
       - name: Sign and verify all existing suites
         env:
           APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          APT_SIGNING_PASSPHRASE: ${{ secrets.APT_SIGNING_PASSPHRASE }}
         run: bash scripts/sign-apt-repo.sh
       - name: Commit signatures and public key
         run: |
