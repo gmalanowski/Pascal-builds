@@ -1,0 +1,29 @@
+name: Sign existing APT repository
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: apt-sign-bootstrap
+  cancel-in-progress: false
+jobs:
+  sign:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign and verify all existing suites
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          APT_SIGNING_PASSPHRASE: ${{ secrets.APT_SIGNING_PASSPHRASE }}
+        run: bash scripts/sign-apt-repo.sh
+      - name: Commit signatures and public key
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apt
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Sign APT repository and publish public key'
+          # Reject concurrent repository changes rather than rebasing stale signatures.
+          git push origin HEAD:main
