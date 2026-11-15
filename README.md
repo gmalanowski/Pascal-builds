@@ -50,6 +50,19 @@ Do not enable both channels on the same machine unless you intentionally want AP
 
 New upstream stable versions are detected automatically. Builds are published as **candidate** artifacts first. Promotion to a stable deployment remains explicit/manual until the build has been validated on real target hardware. Sunshine candidates also enter APT `testing`; the manual promotion workflow publishes the validated package to APT `stable`.
 
+Sunshine also builds and publishes candidates automatically after changes to
+`sunshine/`, `scripts/`, `tests/`, or its build workflow reach `main` (including
+PR merges). Both Ubuntu packages must build successfully and compatibility
+regression tests must pass before publishing to GitHub Releases and APT
+`testing` / `testing-ubuntu26`. The latest stable upstream tag is resolved once
+per run and shared by both builds and publication. APT-only commits do not
+trigger another build.
+
+For an explicit upstream tag or to retry publication, run **Build Sunshine
+compatibility package** manually on `main` with `upstream_ref` set to the stable
+release tag. PR builds and manual runs on other branches do not publish.
+Stable promotion remains manual after validation on the target GPU.
+
 ## Security
 
 All CI runs on GitHub-hosted runners. This repository has no deployment credentials and no access to any homelab or production server.
