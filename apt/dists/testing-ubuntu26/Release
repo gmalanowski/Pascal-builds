@@ -1,0 +1,17 @@
+Origin: Pascal Builds
+Label: Pascal Builds
+Suite: testing-ubuntu26
+Codename: testing-ubuntu26
+Architectures: amd64
+Components: main
+Description: Pascal compatibility builds
+Date: Sun, 15 Nov 2026 11:58:21 +0000
+MD5Sum:
+ ba58063c06c98b076f7686533403882a             1499 main/binary-amd64/Packages
+ 38457175c7c263649d48711ac00a6032              709 main/binary-amd64/Packages.gz
+SHA1:
+ ff2ceed515e9f35d2ffd0b72e3640d2795267ce8             1499 main/binary-amd64/Packages
+ c1965dfd863e0597fe39a8bbdc9e12314fda14c5              709 main/binary-amd64/Packages.gz
+SHA256:
+ ec85b035c35e31aa7440b1de8ebe427a62120988bd9629b2e98c62fedb249aa2             1499 main/binary-amd64/Packages
+ 14903baf16aa68a854e9a62730146a8e819afeb4a6c5527b1a51476c3b35ec4d              709 main/binary-amd64/Packages.gz
