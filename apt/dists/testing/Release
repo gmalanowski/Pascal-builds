@@ -5,13 +5,13 @@ Codename: testing
 Architectures: amd64
 Components: main
 Description: Pascal compatibility builds
-Date: Sun, 15 Nov 2026 11:58:21 +0000
+Date: Sun, 15 Nov 2026 12:33:25 +0000
 MD5Sum:
- 35e494537eedcc36fd4af7b1765003ab             4496 main/binary-amd64/Packages
- c1d3d55cca3ee0edb1c759987574c3c0             1094 main/binary-amd64/Packages.gz
+ 2c88e87c8b545c3300bced021f57b4dc             4496 main/binary-amd64/Packages
+ 94a9e0021589324ec70e4008db6c0360             1095 main/binary-amd64/Packages.gz
 SHA1:
- 9f3dfa00ea09130444808134f7fc029807f33507             4496 main/binary-amd64/Packages
- b21c9d54e629398add34140c0354161a0abf6bd2             1094 main/binary-amd64/Packages.gz
+ ffe80c21197bc6fa8a00429f4eac927181dc2789             4496 main/binary-amd64/Packages
+ c452736062653e1a22dc018f97ebc866bd7a5ed2             1095 main/binary-amd64/Packages.gz
 SHA256:
- 6ed59607c4e77e7b93f11d460d445e77633a38e68d81e25189072ebc31b38b80             4496 main/binary-amd64/Packages
- 83aaa1a4b8b03d5254dad7de14718953d7dfeb3b82d0495244d70b6232142930             1094 main/binary-amd64/Packages.gz
+ ea00139bb8b311a5c9ab999f84817c2b427efc045ea28a576d817c76a61990b7             4496 main/binary-amd64/Packages
+ 55bf5e76018eb263719415b7c90801e052da5b4e85dcbcdc44ecde4ae9582291             1095 main/binary-amd64/Packages.gz

@@ -5,13 +5,13 @@ Codename: testing-ubuntu26
 Architectures: amd64
 Components: main
 Description: Pascal compatibility builds
-Date: Sun, 15 Nov 2026 11:58:21 +0000
+Date: Sun, 15 Nov 2026 12:33:26 +0000
 MD5Sum:
- ba58063c06c98b076f7686533403882a             1499 main/binary-amd64/Packages
- 38457175c7c263649d48711ac00a6032              709 main/binary-amd64/Packages.gz
+ 24c8602768ff5e88743f5f49f13a4ef8             1499 main/binary-amd64/Packages
+ 9a172305d4e172d5a59e6e5c2a38ffb3              709 main/binary-amd64/Packages.gz
 SHA1:
- ff2ceed515e9f35d2ffd0b72e3640d2795267ce8             1499 main/binary-amd64/Packages
- c1965dfd863e0597fe39a8bbdc9e12314fda14c5              709 main/binary-amd64/Packages.gz
+ f8df478d85008d52908f95189ce5380a97fe5c6c             1499 main/binary-amd64/Packages
+ 503350539ad44ab078e8187dcdc77e73be51dea1              709 main/binary-amd64/Packages.gz
 SHA256:
- ec85b035c35e31aa7440b1de8ebe427a62120988bd9629b2e98c62fedb249aa2             1499 main/binary-amd64/Packages
- 14903baf16aa68a854e9a62730146a8e819afeb4a6c5527b1a51476c3b35ec4d              709 main/binary-amd64/Packages.gz
+ 82c1cc37a18a2b2f3194cf9918231979afa925820799382ee3d320dc2acff05a             1499 main/binary-amd64/Packages
+ 3c6a44900e7a99e7e0bdc237cd2411dda312cde07afc55f92ed32df91efd2ec6              709 main/binary-amd64/Packages.gz
